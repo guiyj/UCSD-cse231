@@ -21,7 +21,7 @@ struct ReachingInfo: Info {
     errs() << '\n';
   }
 
-  void setBit(unsigned i) {
+  void set(unsigned i) {
     reaches.insert(i);
   }
 
@@ -57,22 +57,22 @@ private:
       in = in + *(EdgeToInfo.at({i, cur}));
     }
 
-    if (I == nullptr || isa<BranchInst>(I) || isa<SwitchInst>(I) || isa<StoreInst>(I)) {
+    if (isa<BranchInst>(I) || isa<SwitchInst>(I) || isa<StoreInst>(I)) {
       out = in;
     } else if (isa<BinaryOperator>(I) || isa<AllocaInst>(I) || isa<LoadInst>(I) || 
                isa<GetElementPtrInst>(I) || isa<CmpInst>(I) || isa<SelectInst>(I)) {
-      in.setBit(cur);
+      in.set(cur);
       out = in;
     } else if (isa<PHINode>(I)) {
       auto BB = I->getParent();
       auto end = BB->getFirstNonPHI();
       // iter over consecutive Phi instructions
       for (auto ii = BB->begin(); &*ii != end; ++ii) {
-        in.setBit(InstrToIndex[&*ii]);
+        in.set(InstrToIndex[&*ii]);
       }
       out = in;
     } else {
-      // treated as non-returned inst
+      // treated as do not return a value
       out = in;
     }
     // return n copies of out, for n outgoing edges

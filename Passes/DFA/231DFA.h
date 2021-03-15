@@ -213,7 +213,40 @@ protected:
     *   Implement the following function in part 3 for backward analyses
     */
   void initializeBackwardMap(Function * func) {
+    assignIndiceToInstrs(func);
+    for (auto bi = func->begin(), e = func->end(); bi != e; ++bi) {
+      auto block = &*bi;
+      auto firstInstr = &(block->front());
+      // outcoming edges from firstInstr to predecessors.terminator
+      for (auto pp: predecessors(block)) {
+        addEdge(firstInstr, pp->getTerminator(), &Bottom);
+      }
 
+      if (isa<PHINode>(firstInstr)) {
+        addEdge(block->getFirstNonPHI(), firstInstr, &Bottom);
+      }
+
+      auto firstNonPhi = block->getFirstNonPHI();
+      for (auto ii = block->rbegin(), ie = block->rend(); ii != ie; ++ii) {
+        Instruction* instr = &*ii;
+        if (instr == firstNonPhi) {
+          break;
+        }
+        auto prev = (Instruction *)instr->getPrevNode();
+        addEdge(instr, prev, &Bottom);
+      }
+      // incoming edges from successors
+      Instruction* term = block->getTerminator();
+      for (auto sp: successors(block)) {
+        auto src = &(sp->front());
+        addEdge(src, term, &Bottom);
+      }
+    }
+
+    EntryInstr = (Instruction *) &((func->back()).back());
+    addEdge(nullptr, EntryInstr, &InitialState);
+
+    return;
   }
 
   /*
@@ -285,14 +318,17 @@ protected:
 				worklist.pop_front();
 
         getIncomingEdges(cur, &incomingEdges);
-        // skip 0-indegree instructions in DFA CFG (e.g. non-leader Phi)
-        if (incomingEdges.empty()) {
+				getOutgoingEdges(cur, &outgoingEdges);
+        // skip 0-indegree or 0-outdegree instructions
+        // (e.g. non-leader Phi, info provider and comsumer)
+        if (incomingEdges.empty() || outgoingEdges.empty()) {
+          incomingEdges.clear();
+          outgoingEdges.clear();
           continue;
         }
-				getOutgoingEdges(cur, &outgoingEdges);
 
 				flowfunction(IndexToInstr[cur], incomingEdges, outgoingEdges, outInfo);
-				
+
 				for (size_t i = 0; i < outInfo.size(); ++i) {
 					auto &infoOnEdge = EdgeToInfo.at({cur, outgoingEdges[i]});
 
